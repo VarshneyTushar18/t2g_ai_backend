@@ -8,22 +8,19 @@ dotenv.config();
 const app = express();
 
 /* ======================================================
-   ✅ CORS CONFIG (ENV-BASED + LOCAL FALLBACK)
+   ✅ CORS CONFIG
 ====================================================== */
 
-// Allow multiple environments
 const allowedOrigins = [
-  process.env.FRONTEND_URL,          // from .env (prod or custom)
-  "http://localhost:5173",           // local dev fallback
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
 ];
 
-// Clean undefined values
 const filteredOrigins = allowedOrigins.filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (Postman, mobile apps, etc.)
       if (!origin) return callback(null, true);
 
       if (filteredOrigins.includes(origin)) {
@@ -39,6 +36,18 @@ app.use(
 );
 
 app.use(express.json());
+
+/* ======================================================
+   ✅ EMAIL TRANSPORT (reuse, not inside route)
+====================================================== */
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 /* ======================================================
    ✅ CONTACT API
@@ -57,19 +66,13 @@ app.post("/contact", async (req, res) => {
     } = req.body;
 
     // ✅ Validation
-    if (
-      !name?.trim() ||
-      !email?.trim() ||
-      !message?.trim() ||
-      !service
-    ) {
+    if (!name?.trim() || !email?.trim() || !message?.trim() || !service) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
-    // ✅ Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -79,43 +82,47 @@ app.post("/contact", async (req, res) => {
     }
 
     /* ======================================================
-       ✅ EMAIL TRANSPORT
+       ✅ EMAILS (ADMIN + USER)
     ====================================================== */
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    await Promise.all([
+      // ✅ Email to Admin / HR
+      transporter.sendMail({
+        from: `"Contact Form" <${process.env.EMAIL_USER}>`,
+        replyTo: email,
+        to: process.env.EMAIL_USER, // or multiple emails via env
+        subject: `New AI Lead: ${service} | ${name}`,
+        html: `
+          <h3>New Enquiry</h3>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Phone:</strong> ${phone || "N/A"}</p>
+          <p><strong>Company:</strong> ${company || "N/A"}</p>
+          <p><strong>Service:</strong> ${service}</p>
+          <p><strong>AI Product:</strong> ${aiProduct || "N/A"}</p>
+          <p><strong>Message:</strong> ${message}</p>
+        `,
+      }),
 
-    /* ======================================================
-       ✅ EMAIL CONTENT
-    ====================================================== */
+      // ✅ Email to User (confirmation)
+      transporter.sendMail({
+        from: `"Tech2Globe" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: "We’ve received your enquiry",
+        html: `
+          Dear ${name},<br><br>
+          Thank you for contacting us.<br>
+          Our team will review your request and get back to you shortly.<br><br>
 
-    const mailOptions = {
-      from: `"Contact Form" <${process.env.EMAIL_USER}>`,
-      replyTo: email,
-      to: process.env.EMAIL_USER,
-      subject: `New AI Lead: ${service} | ${name}`,
-      html: `
-        <h3>New Enquiry</h3>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Phone:</strong> ${phone || "N/A"}</p>
-        <p><strong>Company:</strong> ${company || "N/A"}</p>
-        <p><strong>Service:</strong> ${service}</p>
-        <p><strong>AI Product:</strong> ${aiProduct || "N/A"}</p>
-        <p><strong>Message:</strong> ${message}</p>
-      `,
-    };
+          <b>Your Details:</b><br>
+          Service: ${service}<br>
+          Phone: ${phone || "N/A"}<br><br>
 
-    /* ======================================================
-       ✅ SEND EMAIL
-    ====================================================== */
-
-    await transporter.sendMail(mailOptions);
+          Regards,<br>
+          <b>Team Tech2Globe</b>
+        `,
+      }),
+    ]);
 
     return res.json({
       success: true,
@@ -133,7 +140,7 @@ app.post("/contact", async (req, res) => {
 });
 
 /* ======================================================
-   ✅ HEALTH CHECK (OPTIONAL BUT USEFUL)
+   ✅ HEALTH CHECK
 ====================================================== */
 
 app.get("/", (req, res) => {
