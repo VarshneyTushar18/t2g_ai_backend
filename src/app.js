@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 
 import leadRoutes from "./routes/lead.routes.js";
-
+import authRoutes from "./routes/auth.routes.js";
 
 
 const app = express();
@@ -16,7 +16,7 @@ const allowedOrigins = [
   process.env.ADMIN_URL,
 
   "http://localhost:5173", // main site
-  "http://localhost:5174", // admin panel
+  "http://localhost:8080", // admin panel
   "http://localhost:3000", // fallback
 ].filter(Boolean);
 
@@ -51,6 +51,7 @@ app.use(express.urlencoded({ extended: true }));
 ====================================================== */
 
 app.use("/api", leadRoutes);
+app.use("/api/auth", authRoutes);
 
 /* ======================================================
    ✅ HEALTH CHECK

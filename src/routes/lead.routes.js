@@ -19,9 +19,9 @@ router.post("/contact", createLead);
 /* ======================================================
    ADMIN ROUTES (PROTECTED)
 ====================================================== */
-router.get("/", verifyAdmin, getLeads);          // Get all leads
-router.get("/:id", verifyAdmin, getLeadById);   // Get single lead
-router.put("/:id", verifyAdmin, updateLead);    // Update lead
-router.delete("/:id", verifyAdmin, deleteLead); // Delete lead
+router.get("/leads", verifyAdmin, getLeads);          // Get all leads
+router.get("/leads/:id", verifyAdmin, getLeadById);   // Get single lead
+router.put("/leads/:id", verifyAdmin, updateLead);    // Update lead
+router.delete("/leads/:id", verifyAdmin, deleteLead); // Delete lead
 
 export default router;

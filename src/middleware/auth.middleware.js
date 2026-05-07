@@ -4,7 +4,10 @@ export const verifyAdmin = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    // 🔒 Strict header validation
+    // 🔍 Debug (temporary - remove later)
+    console.log("AUTH HEADER:", authHeader);
+
+    // 🔒 Validate header
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
@@ -14,10 +17,16 @@ export const verifyAdmin = (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
 
+    // 🔍 Debug token
+    console.log("TOKEN:", token);
+
     // 🔒 Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Attach admin to request
+    // 🔍 Debug decoded
+    console.log("DECODED:", decoded);
+
+    // Attach admin
     req.admin = {
       id: decoded.id,
       email: decoded.email,
@@ -26,7 +35,8 @@ export const verifyAdmin = (req, res, next) => {
     next();
 
   } catch (err) {
-    // 🔒 Handle specific JWT errors
+    console.error("JWT ERROR:", err.message);
+
     if (err.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
