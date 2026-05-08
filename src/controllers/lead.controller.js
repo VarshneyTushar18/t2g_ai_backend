@@ -11,12 +11,11 @@ export const createLead = async (req, res) => {
       email,
       phone,
       company,
-      service,
       aiProduct,
       message,
     } = req.body;
 
-    if (!name?.trim() || !email?.trim() || !message?.trim() || !service) {
+    if (!name?.trim() || !email?.trim() || !message?.trim()){
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
@@ -29,9 +28,9 @@ export const createLead = async (req, res) => {
     // ✅ Save to DB
     const [result] = await pool.execute(
       `INSERT INTO leads 
-      (name, email, phone, company, service, ai_product, message)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, email, phone, company, service, aiProduct, message]
+      (name, email, phone, company, ai_product, message)
+      VALUES (?, ?, ?, ?, ?, ?)`,
+      [name, email, phone, company, aiProduct, message]
     );
 
     // ✅ Send emails
@@ -40,14 +39,13 @@ export const createLead = async (req, res) => {
         from: `"Contact Form" <${process.env.EMAIL_USER}>`,
         replyTo: email,
         to: process.env.EMAIL_USER,
-        subject: `New AI Lead: ${service} | ${name}`,
+        subject: `New AI Lead: ${aiProduct} | ${name}`,
         html: `
           <h3>New Enquiry</h3>
           <p><strong>Name:</strong> ${name}</p>
           <p><strong>Email:</strong> ${email}</p>
           <p><strong>Phone:</strong> ${phone || "N/A"}</p>
           <p><strong>Company:</strong> ${company || "N/A"}</p>
-          <p><strong>Service:</strong> ${service}</p>
           <p><strong>AI Product:</strong> ${aiProduct || "N/A"}</p>
           <p><strong>Message:</strong> ${message}</p>
         `,
