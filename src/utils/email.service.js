@@ -1,23 +1,13 @@
-const isProd = process.env.NODE_ENV === "production";
+import nodemailer from "nodemailer";
 
 export const createTransporter = () => {
-  return nodemailer.createTransport(
-    isProd
-      ? {
-          host: "smtp.zoho.com",
-          port: 587,
-          secure: false,
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-          },
-        }
-      : {
-          service: "gmail",
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-          },
-        }
-  );
+  return nodemailer.createTransport({
+    host: "smtp.zoho.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
 };
