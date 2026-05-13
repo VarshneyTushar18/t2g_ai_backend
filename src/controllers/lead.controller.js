@@ -3,6 +3,7 @@ import axios from "axios";
 import { createTransporter } from "../utils/email.service.js";
 
 const LEAD_EMAILS = ["info@tech2globe.com", "enquiries@tech2globe.net"];
+const SENDER_EMAIL = process.env.SMTP_EMAIL || process.env.SMTP_USER;
 
 export const createLead = async (req, res) => {
   try {
@@ -55,7 +56,7 @@ export const createLead = async (req, res) => {
 
     await Promise.all([
       transporter.sendMail({
-        from: `"Contact Form" <${process.env.SMTP_EMAIL}>`,
+        from: `"Contact Form" <${SENDER_EMAIL}>`,
         replyTo: email,
         to: LEAD_EMAILS.join(","),
 
@@ -124,7 +125,7 @@ export const createLead = async (req, res) => {
       }),
 
       transporter.sendMail({
-        from: `"Tech2Globe" <${process.env.SMTP_EMAIL}>`,
+        from: `"Tech2Globe" <${SENDER_EMAIL}>`,
         to: email,
 
         subject: "We’ve received your enquiry",
