@@ -1,13 +1,11 @@
 import nodemailer from "nodemailer";
 
-export const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: "smtp.zoho.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-};
+export const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST, // smtp.zoho.in
+  port: Number(process.env.SMTP_PORT), // 465
+  secure: true, // must be true for port 465
+  auth: {
+    user: process.env.SMTP_EMAIL, // career@tech2globe.com
+    pass: process.env.SMTP_PASSWORD, // vttbSwHG7nUH
+  },
+});
