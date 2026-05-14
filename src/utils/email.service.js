@@ -14,10 +14,12 @@ const getRequiredEnv = (key, fallbackKeys = []) => {
 };
 
 export const createTransporter = () => {
-  const host = getRequiredEnv("SMTP_HOST");
-  const port = Number(getRequiredEnv("SMTP_PORT"));
-  const user = getRequiredEnv("SMTP_EMAIL", ["SMTP_USER"]);
-  const pass = getRequiredEnv("SMTP_PASSWORD", ["SMTP_PASS"]);
+  const host = process.env.SMTP_HOST?.trim() || "smtp.gmail.com";
+  const port = Number(
+    process.env.SMTP_PORT?.trim() || process.env.EMAIL_PORT || "465",
+  );
+  const user = getRequiredEnv("SMTP_EMAIL", ["SMTP_USER", "EMAIL_USER"]);
+  const pass = getRequiredEnv("SMTP_PASSWORD", ["SMTP_PASS", "EMAIL_PASS"]);
 
   return nodemailer.createTransport({
     host,

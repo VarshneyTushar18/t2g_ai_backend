@@ -1,60 +1,130 @@
 import pool from "../config/db.js";
 import axios from "axios";
 import { createTransporter } from "../utils/email.service.js";
+import { getClientIp, normalizeIp } from "../utils/ip.service.js";
 
 const LEAD_EMAILS = ["info@tech2globe.com", "enquiries@tech2globe.net"];
 const SENDER_EMAIL = process.env.SMTP_EMAIL || process.env.SMTP_USER;
 
+/**
+ * Format datetime for email display (ISO 8601 with explicit UTC label)
+ */
+const formatSubmittedAt = (date) => {
+  const iso = date.toISOString();
+  return `${iso} UTC`;
+};
+
+/**
+ * Generate meaningful location string from country and optional geo data
+ */
+const generateLocation = (country, geoData) => {
+  if (!country) return "Unknown";
+
+  // If geo data available and reliable, append city/region (but never overwrite country)
+  if (geoData?.city || geoData?.region) {
+    const parts = [];
+    if (geoData.city && geoData.city !== "-") parts.push(geoData.city);
+    if (geoData.region && geoData.region !== "-") parts.push(geoData.region);
+    parts.push(country);
+    return parts.join(", ");
+  }
+
+  return country;
+};
+
 export const createLead = async (req, res) => {
   try {
-    const { name, email, phone, company, aiProduct, message, source_page } =
-      req.body;
+    // Log incoming request for debugging
+    console.log("=== LEAD SUBMISSION ===");
+    console.log("Body received:", JSON.stringify(req.body, null, 2));
+    console.log("Headers:", {
+      "x-forwarded-for": req.headers["x-forwarded-for"],
+      "x-real-ip": req.headers["x-real-ip"],
+      "cf-connecting-ip": req.headers["cf-connecting-ip"],
+      "referer": req.headers.referer,
+    });
 
+    // Extract fields (try multiple field names for country)
+    const { name, email, phone, company, aiProduct, message, source_page } = req.body;
+    let country = req.body.country || req.body.countryCode || req.body.country_code || null;
+
+    // ================= VALIDATION =================
     if (!name?.trim() || !email?.trim() || !message?.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Missing required fields: name, email, and message are required",
       });
     }
 
-    // ================= CLIENT IP =================
-
-    const ip =
-      req.headers["cf-connecting-ip"] ||
-      req.headers["x-forwarded-for"]?.split(",")[0] ||
-      req.socket.remoteAddress ||
-      req.ip;
-
-    // ================= LOCATION LOOKUP =================
-
-    let location = "Unknown";
-
-    try {
-      const geoResponse = await axios.get(`https://ipapi.co/${ip}/json/`);
-
-      const geo = geoResponse.data;
-
-      location = `${geo.city || "-"}, ${geo.region || "-"}, ${geo.country_name || "-"}`;
-    } catch (error) {
-      console.log("Geo lookup failed:", error.message);
+    if (!country?.trim()) {
+      console.warn("⚠️  WARNING: Country field not provided or empty");
+      // For now, allow submission but flag it - you can make it required later
+      country = "Unknown";
     }
 
-    // ================= MAILER =================
+    // ================= CLIENT IP =================
+    const rawIp = getClientIp(req);
+    const senderIp = normalizeIp(rawIp);
+    console.log("Raw IP:", rawIp, "-> Normalized:", senderIp);
 
-    const transporter = createTransporter();
+    // ================= LOCATION & GEO =================
+    let location = country; // Default to country
+    let geoData = null;
 
-    // ================= SAVE TO DB =================
+    // Attempt IP-based geo lookup for enrichment (optional, non-blocking)
+    try {
+      const geoResponse = await axios.get(`https://ipapi.co/${rawIp}/json/`, {
+        timeout: 5000,
+      });
+      geoData = geoResponse.data;
+      console.log("Geo lookup result:", JSON.stringify(geoData, null, 2));
+      // Enrich location with city/region, but keep country as primary
+      location = generateLocation(country, geoData);
+      console.log("Generated location:", location);
+    } catch (error) {
+      console.log("❌ Geo lookup failed:", error.message);
+      // Fallback gracefully to just country
+    }
 
+    // ================= SOURCE PAGE =================
+    // Use source_page from request body, fallback to Referer header
+    const sourcePage = source_page || req.headers.referer || null;
+
+    // ================= TIMESTAMP =================
+    // Generate server-side timestamp (not client-tamperable)
+    const submittedAt = new Date();
+
+    // ================= DATABASE INSERT =================
     const [result] = await pool.execute(
       `INSERT INTO leads 
-      (name, email, phone, company, ai_product, message)
-      VALUES (?, ?, ?, ?, ?, ?)`,
-      [name, email, phone, company, aiProduct, message],
+      (name, email, phone, company, ai_product, country, location, sender_ip, source_page, message, submitted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name.trim(),
+        email.trim(),
+        phone?.trim() || null,
+        company?.trim() || null,
+        aiProduct?.trim() || null,
+        country === "Unknown" ? null : country.trim(),
+        location,
+        senderIp,
+        sourcePage,
+        message.trim(),
+        submittedAt,
+      ],
     );
 
-    // ================= SEND EMAILS =================
+    console.log("✅ Lead inserted with ID:", result.insertId);
+    console.log("   Country:", country);
+    console.log("   Location:", location);
+    console.log("   Sender IP:", senderIp);
+    console.log("   Source Page:", sourcePage);
+    console.log("   Submitted At:", formatSubmittedAt(submittedAt));
 
-    await Promise.all([
+    try {
+      const transporter = createTransporter();
+
+      await Promise.all([
       transporter.sendMail({
         from: `"Contact Form" <${SENDER_EMAIL}>`,
         replyTo: email,
@@ -92,9 +162,11 @@ export const createLead = async (req, res) => {
 
             <p><strong>AI Product:</strong> ${aiProduct || "-"}</p>
 
+            <p><strong>Country:</strong> ${country}</p>
+
             <p><strong>Location:</strong> ${location}</p>
 
-            <p><strong>Sender IP:</strong> ${ip}</p>
+            <p><strong>Sender IP:</strong> ${senderIp}</p>
 
             <hr style="border:none;border-top:1px solid #e5e5e5;margin:25px 0;" />
 
@@ -113,10 +185,10 @@ export const createLead = async (req, res) => {
             </h3>
 <p>
   <strong>Source Page:</strong>
-  ${source_page ? `<a href="${source_page}">${source_page}</a>` : "-"}
+  ${sourcePage ? `<a href="${sourcePage}">${sourcePage}</a>` : "-"}
 </p>
 
-            <p><strong>Submitted At:</strong> ${new Date().toLocaleString()}</p>
+            <p><strong>Submitted At:</strong> ${formatSubmittedAt(submittedAt)}</p>
 
           </div>
 
@@ -162,6 +234,8 @@ export const createLead = async (req, res) => {
 
             <p><strong>AI Product:</strong> ${aiProduct || "-"}</p>
 
+            <p><strong>Country:</strong> ${country}</p>
+
             <hr style="border:none;border-top:1px solid #e5e5e5;margin:25px 0;" />
 
             <p>
@@ -174,7 +248,10 @@ export const createLead = async (req, res) => {
         </div>
         `,
       }),
-    ]);
+      ]);
+    } catch (mailErr) {
+      console.error("LEAD EMAIL SEND ERROR:", mailErr?.message || mailErr);
+    }
 
     return res.json({
       success: true,
@@ -183,9 +260,18 @@ export const createLead = async (req, res) => {
   } catch (err) {
     console.error("CREATE LEAD ERROR:", err);
 
+    const detail =
+      err && typeof err === "object"
+        ? err.sqlMessage || err.message
+        : typeof err === "string"
+          ? err
+          : "";
+
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        detail ||
+        "Internal server error (no details). Check API server logs.",
     });
   }
 };
