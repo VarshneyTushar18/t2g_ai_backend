@@ -3,7 +3,7 @@ import axios from "axios";
 import { createTransporter } from "../utils/email.service.js";
 import { getClientIp, normalizeIp } from "../utils/ip.service.js";
 
-const LEAD_EMAILS =  ["Arpit.dhiman@tech2globe.in"];
+const LEAD_EMAILS =  ["info@tech2globe.com", "enquiries@tech2globe.net"];
 const SENDER_EMAIL = process.env.SMTP_EMAIL || process.env.SMTP_USER;
 
 
@@ -191,7 +191,6 @@ export const createLead = async (req, res) => {
                 New AI Lead Received
               </h2>
 
-              <hr style="border:none;border-top:1px solid #e5e5e5;margin:20px 0;" />
 
               <h3 style="margin-bottom:15px;color:#222;">
                 Contact Details
@@ -218,8 +217,6 @@ export const createLead = async (req, res) => {
 
               <p><strong>Sender IP:</strong> ${senderIp || "-"}</p>
 
-              <hr style="border:none;border-top:1px solid #e5e5e5;margin:25px 0;" />
-
               <h3 style="margin-bottom:15px;color:#222;">
                 Message
               </h3>
@@ -228,7 +225,6 @@ export const createLead = async (req, res) => {
                 ${message || "-"}
               </p>
 
-              <hr style="border:none;border-top:1px solid #e5e5e5;margin:25px 0;" />
 
               <h3 style="margin-bottom:15px;color:#222;">
                 Additional Information
@@ -275,8 +271,6 @@ export const createLead = async (req, res) => {
                 Our team has received your enquiry and will get back to you shortly.
               </p>
 
-              <hr style="border:none;border-top:1px solid #e5e5e5;margin:25px 0;" />
-
               <h3>Your Submitted Details</h3>
 
               <p><strong>Name:</strong> ${name}</p>
@@ -290,8 +284,6 @@ export const createLead = async (req, res) => {
               <p><strong>AI Product:</strong> ${aiProduct || "-"}</p>
 
               <p><strong>Country:</strong> ${country}</p>
-
-              <hr style="border:none;border-top:1px solid #e5e5e5;margin:25px 0;" />
 
               <p>
                 Regards,<br />
